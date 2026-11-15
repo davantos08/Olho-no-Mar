@@ -1,0 +1,1599 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Olho no Mar — Comando & Alerta SOS Guarda-Vidas</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg-dark: #020617;
+      --bg-card: #0f172a;
+      --bg-input: #090d16;
+      --border: #1e293b;
+      --border-light: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --sky: #0284c7;
+      --sky-hover: #0ea5e9;
+      --sky-text: #38bdf8;
+      --emerald: #059669;
+      --emerald-text: #34d399;
+      --red: #dc2626;
+      --red-bright: #ef4444;
+      --amber: #d97706;
+      --amber-text: #fbbf24;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.45;
+    }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    .hidden { display: none !important; }
+
+    /* Botões & Inputs */
+    button {
+      cursor: pointer;
+      font-family: inherit;
+      border: none;
+      border-radius: 10px;
+      font-weight: 700;
+      transition: all 0.15s ease;
+    }
+    button:active { transform: scale(0.98); }
+    input, select {
+      width: 100%;
+      padding: 11px 13px;
+      border-radius: 10px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-light);
+      color: var(--text-main);
+      font-size: 14px;
+      outline: none;
+    }
+    input:focus, select:focus { border-color: var(--sky-hover); }
+    label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 5px;
+    }
+
+    /* TELA 1: LOGIN */
+    #loginScreen {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: radial-gradient(circle at top, #0c2d48 0%, #020617 65%);
+    }
+    .login-card {
+      width: 100%;
+      max-width: 420px;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 28px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75);
+    }
+    .brand-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .brand-left { display: flex; align-items: center; gap: 12px; }
+    .brand-icon {
+      width: 44px; height: 44px;
+      border-radius: 14px;
+      background: rgba(14, 165, 233, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--sky-text);
+    }
+    .brand-title { font-size: 20px; font-weight: 900; letter-spacing: -0.02em; }
+    .brand-sub { font-size: 12px; color: var(--text-muted); }
+    .icon-btn {
+      padding: 9px;
+      background: #1e293b;
+      border: 1px solid var(--border-light);
+      color: #cbd5e1;
+    }
+    .status-pill {
+      padding: 9px 12px;
+      border-radius: 10px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+      background: rgba(217, 119, 6, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      color: var(--amber-text);
+    }
+    .status-pill.connected {
+      background: rgba(5, 150, 105, 0.14);
+      border-color: rgba(52, 211, 153, 0.35);
+      color: var(--emerald-text);
+    }
+    .status-pill button {
+      background: transparent;
+      color: inherit;
+      text-decoration: underline;
+      font-size: 12px;
+      padding: 0;
+    }
+    .form-group { margin-bottom: 14px; }
+    .btn-primary {
+      width: 100%;
+      padding: 13px;
+      background: var(--sky);
+      color: #fff;
+      font-size: 14px;
+      margin-top: 6px;
+    }
+    .btn-primary:hover { background: var(--sky-hover); }
+    .error-box {
+      background: rgba(127, 29, 29, 0.55);
+      border: 1px solid #991b1b;
+      color: #fca5a5;
+      font-size: 12px;
+      padding: 9px 12px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+    .login-footer {
+      margin-top: 20px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      font-size: 11px;
+      color: #64748b;
+      text-align: center;
+    }
+
+    /* TOPBAR COMPARTILHADA */
+    .topbar {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 18px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .btn-secondary {
+      padding: 8px 13px;
+      background: #1e293b;
+      color: #e2e8f0;
+      font-size: 12px;
+    }
+    .btn-secondary:hover { background: #334155; }
+
+    /* TELA 2: GUARDA-VIDAS */
+    #gvScreen, #centralScreen { flex: 1; display: flex; flex-direction: column; }
+    .gv-container {
+      width: 100%;
+      max-width: 500px;
+      margin: 0 auto;
+      padding: 16px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 14px;
+    }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px;
+    }
+    .posto-item {
+      background: #090d16;
+      border: 1px solid var(--border-light);
+      border-radius: 14px;
+      padding: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 9px;
+    }
+    .posto-item.locked { opacity: 0.65; border-color: var(--border); }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+    .badge-green { background: rgba(16, 185, 129, 0.16); color: var(--emerald-text); }
+    .badge-red { background: rgba(239, 68, 68, 0.18); color: #fca5a5; }
+    .badge-amber { background: rgba(245, 158, 11, 0.18); color: var(--amber-text); }
+    .badge-gray { background: #1e293b; color: #94a3b8; }
+
+    .nature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .nature-btn {
+      padding: 10px 12px;
+      background: #090d16;
+      border: 1px solid var(--border-light);
+      color: #cbd5e1;
+      font-size: 12px;
+      text-align: left;
+    }
+    .nature-btn.selected {
+      border-color: var(--red-bright);
+      background: rgba(239, 68, 68, 0.22);
+      color: #fff;
+    }
+
+    @keyframes pulse-sos {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.75); }
+      70% { box-shadow: 0 0 0 28px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+    .sos-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 18px 0;
+    }
+    #sosTriggerBtn {
+      width: 215px;
+      height: 215px;
+      border-radius: 50%;
+      background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
+      border: 8px solid #450a0a;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      animation: pulse-sos 1.6s infinite;
+    }
+    #sosTriggerBtn .sos-big { font-size: 48px; font-weight: 900; line-height: 1; }
+    #sosTriggerBtn .sos-sub { font-size: 11px; letter-spacing: 0.12em; margin-top: 6px; text-transform: uppercase; }
+
+    /* TELA 3: CENTRAL */
+    .tab-bar {
+      display: flex;
+      gap: 6px;
+      background: #090d16;
+      padding: 4px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+    .central-tab {
+      padding: 7px 12px;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+    .central-tab.active {
+      background: var(--sky);
+      color: #fff;
+    }
+    .monitor-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1.45fr 1fr;
+      min-height: calc(100vh - 64px);
+    }
+    @media (max-width: 960px) {
+      .monitor-grid { grid-template-columns: 1fr; }
+      #map { min-height: 360px !important; }
+    }
+    #map { width: 100%; height: 100%; min-height: 460px; background: #0f172a; }
+    .side-panel {
+      border-left: 1px solid var(--border);
+      background: var(--bg-dark);
+      overflow-y: auto;
+      max-height: calc(100vh - 64px);
+    }
+    .panel-section { padding: 16px; border-bottom: 1px solid var(--border); }
+    .section-title {
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .alert-card {
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid var(--red-bright);
+      background: rgba(127, 29, 29, 0.45);
+      margin-bottom: 10px;
+    }
+    .alert-card.ciente {
+      border-color: var(--amber);
+      background: rgba(120, 53, 15, 0.3);
+    }
+    .admin-container {
+      width: 100%;
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 900px) {
+      .admin-container { grid-template-columns: 1fr; }
+    }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    @media (max-width: 600px) {
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+    pre {
+      background: #090d16;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      font-size: 11px;
+      overflow-x: auto;
+      max-height: 400px;
+      color: #6ee7b7;
+    }
+
+    /* MODAL */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      background: rgba(0, 0, 0, 0.82);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border-light);
+      border-radius: 18px;
+      max-width: 440px;
+      width: 100%;
+      padding: 24px;
+    }
+
+    /* MARCADORES LEAFLET */
+    .leaflet-marker-icon.sos-marker { background: transparent; border: none; }
+    .marker-ping {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: #ef4444; border: 3px solid #fff;
+      box-shadow: 0 0 18px #ef4444;
+    }
+    .posto-marker {
+      width: 16px; height: 16px; border-radius: 50%;
+      background: #0ea5e9; border: 2px solid #fff;
+    }
+    .posto-marker.occupied { background: #10b981; }
+    .posto-marker.inactive { background: #64748b; }
+  </style>
+</head>
+<body>
+
+  <!-- ========================================================= -->
+  <!-- TELA 1: LOGIN & ACESSO RESTRITO                           -->
+  <!-- ========================================================= -->
+  <section id="loginScreen">
+    <div class="login-card">
+      <div class="brand-row">
+        <div class="brand-left">
+          <div class="brand-icon">
+            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          </div>
+          <div>
+            <div class="brand-title">OLHO NO MAR</div>
+            <div class="brand-sub">Sistema Operacional de Salvamento Aquático</div>
+          </div>
+        </div>
+        <button class="icon-btn" onclick="openCloudModal()" title="Configurar Servidor Supabase">⚙️</button>
+      </div>
+
+      <div id="cloudStatusBadge" class="status-pill">
+        <span>Banco Local Ativo</span>
+        <button onclick="openCloudModal()">Conectar Servidor</button>
+      </div>
+
+      <form onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label>E-mail ou Login Funcional</label>
+          <input id="loginEmail" type="email" required autocomplete="username" placeholder="usuario@olhonomar.gov.br" />
+        </div>
+        <div class="form-group">
+          <label>Senha</label>
+          <input id="loginPassword" type="password" required autocomplete="current-password" placeholder="••••••••" />
+        </div>
+        <div id="loginError" class="error-box hidden"></div>
+        <button type="submit" class="btn-primary">Acessar Sistema</button>
+      </form>
+
+      <div class="login-footer">
+        Acesso restrito a operadores autorizados da Central e Guarda-Vidas cadastrados.
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================= -->
+  <!-- TELA 2: GUARDA-VIDAS (CHECK-IN EXCLUSIVO + BOTÃO SOS)     -->
+  <!-- ========================================================= -->
+  <section id="gvScreen" class="hidden">
+    <header class="topbar">
+      <div>
+        <div style="font-size:14px; font-weight:900;">OLHO NO MAR • AGENTE</div>
+        <div id="gvUserLabel" style="font-size:11px; color:#94a3b8;">Agente Conectado</div>
+      </div>
+      <button class="btn-secondary" onclick="logout()">Sair</button>
+    </header>
+
+    <!-- ETAPA A: CHECK-IN DE POSTO EXCLUSIVO -->
+    <div id="gvCheckinStep" class="gv-container">
+      <div class="card">
+        <span class="badge badge-green" style="margin-bottom:8px;">Check-in de Serviço</span>
+        <h3 style="font-size:18px; font-weight:800;">Escolha o Posto de Atuação</h3>
+        <p style="font-size:12px; color:#94a3b8; margin-top:4px; margin-bottom:14px;">
+          Postos já assumidos por outro guarda-vidas ou com coordenadas em uso ficam bloqueados automaticamente.
+        </p>
+
+        <div id="gvCheckinAlert" class="error-box hidden"></div>
+        <div id="gvPostoList" style="max-height:330px; overflow-y:auto;"></div>
+
+        <div style="margin-top:14px; padding-top:12px; border-top:1px solid #1e293b; display:flex; justify-content:space-between; font-size:11px; color:#94a3b8;">
+          <span id="gvCheckinGpsStatus">Verificando GPS do aparelho...</span>
+          <button onclick="refreshGps()" style="background:transparent; color:#38bdf8; padding:0;">Atualizar GPS</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ETAPA B: BOTÃO SOS -->
+    <div id="gvSosStep" class="gv-container hidden">
+      <div class="card" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <div>
+          <div style="font-size:10px; font-weight:800; color:#34d399; text-transform:uppercase;">Em Serviço • Posto Exclusivo</div>
+          <div id="gvActivePostoName" style="font-size:16px; font-weight:900; margin-top:2px;">Posto</div>
+          <div id="gvActiveCoords" class="mono" style="font-size:11px; color:#94a3b8; margin-top:2px;">0.00000, 0.00000</div>
+        </div>
+        <button onclick="releaseCurrentPosto()" style="padding:9px 12px; background:rgba(245,158,11,0.16); border:1px solid rgba(245,158,11,0.4); color:#fbbf24; font-size:11px;">
+          Encerrar Turno / Trocar
+        </button>
+      </div>
+
+      <div class="card" style="padding:14px;">
+        <label>Natureza da Ocorrência (Opcional)</label>
+        <div class="nature-grid">
+          <button type="button" onclick="selectNature('Afogamento / Resgate')" data-nature="Afogamento / Resgate" class="nature-btn selected">🌊 Afogamento</button>
+          <button type="button" onclick="selectNature('Apoio Médico / Trauma')" data-nature="Apoio Médico / Trauma" class="nature-btn">🚑 Apoio Médico</button>
+          <button type="button" onclick="selectNature('Embarcação / Moto Aquática')" data-nature="Embarcação / Moto Aquática" class="nature-btn">🚤 Embarcação</button>
+          <button type="button" onclick="selectNature('Busca / Desaparecido')" data-nature="Busca / Desaparecido" class="nature-btn">🔍 Busca na Orla</button>
+        </div>
+      </div>
+
+      <div class="sos-wrap">
+        <button id="sosTriggerBtn" onclick="triggerSosAlert()">
+          <span class="sos-big">SOS</span>
+          <span class="sos-sub">Apertar Emergência</span>
+        </button>
+        <p style="font-size:12px; color:#94a3b8; text-align:center; margin-top:16px; max-width:290px;">
+          Um toque envia imediatamente a localização deste posto para a sirene da Central.
+        </p>
+      </div>
+
+      <div id="gvStatusBanner" class="card hidden" style="text-align:center;"></div>
+    </div>
+  </section>
+
+  <!-- ========================================================= -->
+  <!-- TELA 3: CENTRAL DE COMANDO                                -->
+  <!-- ========================================================= -->
+  <section id="centralScreen" class="hidden">
+    <header class="topbar">
+      <div>
+        <div style="font-size:15px; font-weight:900;">OLHO NO MAR • CENTRAL</div>
+        <div id="centralOperatorInfo" style="font-size:11px; color:#94a3b8;">Operador Logado</div>
+      </div>
+
+      <nav class="tab-bar">
+        <button onclick="switchCentralTab('monitor')" id="tabBtn-monitor" class="central-tab active">Monitoramento & Mapa</button>
+        <button onclick="switchCentralTab('admin')" id="tabBtn-admin" class="central-tab">Agentes & Postos</button>
+        <button onclick="switchCentralTab('deploy')" id="tabBtn-deploy" class="central-tab">Servidor, SQL & LoRa</button>
+      </nav>
+
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button id="audioUnlockBtn" onclick="unlockAudio()" style="padding:8px 12px; background:rgba(245,158,11,0.16); border:1px solid rgba(245,158,11,0.45); color:#fbbf24; font-size:12px;">
+          🔊 Ativar Sirene
+        </button>
+        <button class="btn-secondary" onclick="testSiren()">Testar Som</button>
+        <button class="btn-secondary" onclick="logout()">Sair</button>
+      </div>
+    </header>
+
+    <!-- ABA 1: MONITORAMENTO & MAPA -->
+    <div id="tab-monitor" class="monitor-grid">
+      <div id="map"></div>
+      <div class="side-panel">
+        <div class="panel-section">
+          <div class="section-title" style="color:#f87171;">
+            <span>🚨 Alertas SOS Ativos (<span id="activeAlertCount">0</span>)</span>
+            <button onclick="exportAlertsCsv()" style="background:transparent; color:#38bdf8; font-size:11px; padding:0;">Exportar CSV</button>
+          </div>
+          <div id="activeAlertsList"></div>
+        </div>
+
+        <div class="panel-section">
+          <div class="section-title" style="color:#34d399;">
+            <span>Efetivo em Serviço nos Postos (<span id="activeShiftCount">0</span>)</span>
+          </div>
+          <div id="activeShiftsList"></div>
+        </div>
+
+        <div class="panel-section" style="border-bottom:none;">
+          <div class="section-title" style="color:#94a3b8;">
+            <span>Histórico Encerrado</span>
+          </div>
+          <div id="historyAlertsList"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ABA 2: AGENTES & POSTOS -->
+    <div id="tab-admin" class="admin-container hidden">
+      <div class="card">
+        <h2 style="font-size:16px; font-weight:800;">1. Cadastro Individual por Pessoa</h2>
+        <p style="font-size:12px; color:#94a3b8; margin:4px 0 14px;">
+          Cadastre cada guarda-vidas com login e senha próprios. Ao entrar, o agente escolhe o posto livre em que vai atuar.
+        </p>
+
+        <form onsubmit="handleCreateUser(event)" style="background:#090d16; padding:14px; border-radius:14px; border:1px solid #1e293b; margin-bottom:14px;">
+          <div class="grid-2" style="margin-bottom:10px;">
+            <div>
+              <label>Nome Completo</label>
+              <input id="newUserName" type="text" required placeholder="Ex: Sd. Carlos Silva" />
+            </div>
+            <div>
+              <label>Matrícula / ID</label>
+              <input id="newUserBadge" type="text" required placeholder="Ex: GV-104" class="mono" />
+            </div>
+          </div>
+          <div class="grid-3" style="margin-bottom:10px;">
+            <div>
+              <label>E-mail / Login</label>
+              <input id="newUserEmail" type="email" required placeholder="carlos@olhonomar.gov.br" />
+            </div>
+            <div>
+              <label>Senha</label>
+              <input id="newUserPass" type="text" required minlength="6" placeholder="Mín. 6 dígitos" class="mono" />
+            </div>
+            <div>
+              <label>Perfil</label>
+              <select id="newUserRole">
+                <option value="guarda_vidas">Guarda-Vidas</option>
+                <option value="central">Operador Central</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="btn-primary">+ Cadastrar Pessoa no Sistema</button>
+        </form>
+
+        <div id="usersTableList" style="max-height:340px; overflow-y:auto;"></div>
+      </div>
+
+      <div class="card">
+        <h2 style="font-size:16px; font-weight:800;">2. Postos de Guarda-Vidas & Coordenadas</h2>
+        <p style="font-size:12px; color:#94a3b8; margin:4px 0 14px;">
+          Cadastre os postos da orla ou clique diretamente no mapa na aba de Monitoramento para capturar latitude e longitude.
+        </p>
+
+        <form onsubmit="handleSavePosto(event)" style="background:#090d16; padding:14px; border-radius:14px; border:1px solid #1e293b; margin-bottom:14px;">
+          <input type="hidden" id="editPostoId" />
+          <div class="grid-3" style="margin-bottom:10px;">
+            <div>
+              <label>Nome do Posto</label>
+              <input id="postoName" type="text" required placeholder="Ex: Posto 04 - Pina" />
+            </div>
+            <div>
+              <label>Latitude</label>
+              <input id="postoLat" type="number" step="any" required placeholder="-8.11940" class="mono" />
+            </div>
+            <div>
+              <label>Longitude</label>
+              <input id="postoLng" type="number" step="any" required placeholder="-34.89420" class="mono" />
+            </div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button type="submit" id="savePostoBtn" style="flex:1; padding:11px; background:#059669; color:#fff; font-size:13px;">Salvar Posto</button>
+            <button type="button" onclick="resetPostoForm()" class="btn-secondary">Limpar</button>
+          </div>
+        </form>
+
+        <div id="postosAdminList" style="max-height:340px; overflow-y:auto;"></div>
+      </div>
+    </div>
+
+    <!-- ABA 3: SERVIDOR, SQL & LORA -->
+    <div id="tab-deploy" class="admin-container hidden">
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <h3 style="font-size:14px; font-weight:800;">Script SQL de Produção (Supabase)</h3>
+          <button class="btn-secondary" onclick="copyCode('sqlScriptBox')">Copiar SQL</button>
+        </div>
+        <pre id="sqlScriptBox" class="mono">-- OLHO NO MAR - ESTRUTURA DE BANCO DE PRODUÇÃO (SUPABASE)
+create table if not exists perfis (
+  id uuid primary key references auth.users(id) on delete cascade,
+  nome text not null,
+  matricula text not null unique,
+  email text not null unique,
+  role text not null check (role in ('central', 'guarda_vidas')),
+  ativo boolean default true,
+  criado_em timestamptz default now()
+);
+
+create table if not exists postos (
+  id uuid primary key default gen_random_uuid(),
+  nome text not null unique,
+  lat double precision not null,
+  lng double precision not null,
+  ativo boolean default true,
+  constraint postos_coordenadas_unicas unique (lat, lng)
+);
+
+-- Trava exclusiva: impede 2 agentes no mesmo posto ou nas mesmas coordenadas
+create table if not exists turnos_ativos (
+  id uuid primary key default gen_random_uuid(),
+  agente_id uuid not null unique references perfis(id) on delete cascade,
+  agente_nome text not null,
+  agente_matricula text not null,
+  posto_id uuid not null unique references postos(id) on delete cascade,
+  posto_nome text not null,
+  lat double precision not null,
+  lng double precision not null,
+  iniciado_em timestamptz default now(),
+  constraint turnos_coordenadas_unicas unique (lat, lng)
+);
+
+create table if not exists alertas (
+  id uuid primary key default gen_random_uuid(),
+  posto_id uuid references postos(id),
+  posto_nome text not null,
+  agente_id uuid references perfis(id),
+  agente_nome text not null,
+  natureza text default 'Afogamento / Resgate',
+  lat double precision not null,
+  lng double precision not null,
+  status text not null default 'ativo' check (status in ('ativo', 'ciente', 'atendido')),
+  criado_em timestamptz default now(),
+  ciente_em timestamptz,
+  encerrado_em timestamptz
+);
+
+alter publication supabase_realtime add table postos, turnos_ativos, alertas;</pre>
+      </div>
+
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <h3 style="font-size:14px; font-weight:800;">Firmware Base Receptora ESP32 + LoRa</h3>
+          <button class="btn-secondary" onclick="copyCode('espCodeBox')">Copiar C++</button>
+        </div>
+        <pre id="espCodeBox" class="mono" style="color:#7dd3fc;">// Base Receptora LoRa 915MHz -> Envia Alerta SOS direto para Central
+#include &lt;WiFi.h&gt;
+#include &lt;HTTPClient.h&gt;
+
+const char* SUPABASE_URL = "https://SEU-PROJETO.supabase.co/rest/v1/alertas";
+const char* SUPABASE_KEY = "SUA_ANON_KEY";
+
+void enviarAlertaCentral(String postoNome, String agenteNome, float lat, float lng) {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(SUPABASE_URL);
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("apikey", SUPABASE_KEY);
+    http.addHeader("Authorization", String("Bearer ") + SUPABASE_KEY);
+
+    String payload = "{\"posto_nome\":\"" + postoNome +
+                     "\",\"agente_nome\":\"" + agenteNome +
+                     "\",\"natureza\":\"Botao Fisico LoRa SOS\"" +
+                     ",\"lat\":" + String(lat, 6) +
+                     ",\"lng\":" + String(lng, 6) + "}";
+    http.POST(payload);
+    http.end();
+  }
+}</pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================= -->
+  <!-- MODAL CONFIGURAÇÃO SUPABASE                               -->
+  <!-- ========================================================= -->
+  <div id="cloudModal" class="modal-backdrop hidden">
+    <div class="modal-box">
+      <h3 style="font-size:17px; font-weight:800;">Conectar Servidor Supabase</h3>
+      <p style="font-size:12px; color:#94a3b8; margin:6px 0 14px;">
+        Insira as credenciais do projeto Supabase para sincronizar os aparelhos dos guarda-vidas e o painel da Central em tempo real.
+      </p>
+      <div class="form-group">
+        <label>Project URL</label>
+        <input id="cfgSupabaseUrl" type="url" placeholder="https://xyzcompany.supabase.co" class="mono" />
+      </div>
+      <div class="form-group">
+        <label>Anon Public Key</label>
+        <input id="cfgSupabaseKey" type="text" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..." class="mono" />
+      </div>
+      <div style="display:flex; gap:8px; margin-top:16px;">
+        <button onclick="saveCloudConfig()" style="flex:1; padding:11px; background:#0284c7; color:#fff; font-size:12px;">Salvar & Conectar</button>
+        <button onclick="clearCloudConfig()" class="btn-secondary" style="color:#fbbf24;">Banco Local</button>
+        <button onclick="closeCloudModal()" class="btn-secondary">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'olho_no_mar_prod_state';
+    const SESSION_KEY = 'olho_no_mar_active_session';
+    const CLOUD_CFG_KEY = 'olho_no_mar_cloud_cfg';
+    let supabaseClient = null;
+    let supabaseAdminAux = null;
+    let currentUser = null;
+    let currentShift = null;
+    let selectedNature = 'Afogamento / Resgate';
+    let deviceGps = null;
+
+    let map = null;
+    let mapMarkersLayer = null;
+    let audioCtx = null;
+    let sirenInterval = null;
+
+    const initialProdState = {
+      users: [
+        { id: 'u-central-master', nome: 'Central de Comando', matricula: 'CENT-01', email: 'central@olhonomar.gov.br', senha: '123456', role: 'central', ativo: true }
+      ],
+      postos: [
+        { id: 'p-01', nome: 'Posto 01 - Pina', lat: -8.09540, lng: -34.88210, ativo: true },
+        { id: 'p-02', nome: 'Posto 02 - Segundo Jardim', lat: -8.10890, lng: -34.88950, ativo: true },
+        { id: 'p-03', nome: 'Posto 03 - Acaiaca', lat: -8.11940, lng: -34.89420, ativo: true },
+        { id: 'p-04', nome: 'Posto 04 - Parque Dona Lindu', lat: -8.13380, lng: -34.90080, ativo: true }
+      ],
+      turnos_ativos: [],
+      alertas: []
+    };
+
+    function getState() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(initialProdState));
+        return JSON.parse(JSON.stringify(initialProdState));
+      }
+      return JSON.parse(raw);
+    }
+
+    function setState(newState) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+      syncUiAll();
+    }
+
+    window.addEventListener('storage', (e) => {
+      if (e.key === STORAGE_KEY) syncUiAll();
+    });
+
+    function initCloud() {
+      const cfg = JSON.parse(localStorage.getItem(CLOUD_CFG_KEY) || 'null');
+      const badge = document.getElementById('cloudStatusBadge');
+      if (cfg && cfg.url && cfg.key && window.supabase) {
+        supabaseClient = window.supabase.createClient(cfg.url, cfg.key);
+        supabaseAdminAux = window.supabase.createClient(cfg.url, cfg.key, {
+          auth: { persistSession: false, autoRefreshToken: false }
+        });
+        badge.className = 'status-pill connected';
+        badge.innerHTML = '<span>Servidor em Nuvem Conectado</span><button onclick="openCloudModal()">Alterar</button>';
+        subscribeRealtimeSupabase();
+      } else {
+        supabaseClient = null;
+        badge.className = 'status-pill';
+        badge.innerHTML = '<span>Banco Local Ativo</span><button onclick="openCloudModal()">Conectar Servidor</button>';
+      }
+    }
+
+    function subscribeRealtimeSupabase() {
+      if (!supabaseClient) return;
+      supabaseClient.channel('olho-no-mar-prod-rt')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'alertas' }, () => pullFromSupabase())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'postos' }, () => pullFromSupabase())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'turnos_ativos' }, () => pullFromSupabase())
+        .subscribe();
+    }
+
+    async function pullFromSupabase() {
+      if (!supabaseClient) return;
+      const [uRes, pRes, tRes, aRes] = await Promise.all([
+        supabaseClient.from('perfis').select('*'),
+        supabaseClient.from('postos').select('*').order('nome'),
+        supabaseClient.from('turnos_ativos').select('*'),
+        supabaseClient.from('alertas').select('*').order('criado_em', { ascending: false }).limit(50)
+      ]);
+      const st = getState();
+      if (uRes.data) st.users = uRes.data.map(u => ({ ...u, senha: '••••••' }));
+      if (pRes.data) st.postos = pRes.data;
+      if (tRes.data) st.turnos_ativos = tRes.data;
+      if (aRes.data) st.alertas = aRes.data;
+      setState(st);
+    }
+
+    function openCloudModal() {
+      const cfg = JSON.parse(localStorage.getItem(CLOUD_CFG_KEY) || '{}');
+      document.getElementById('cfgSupabaseUrl').value = cfg.url || '';
+      document.getElementById('cfgSupabaseKey').value = cfg.key || '';
+      document.getElementById('cloudModal').classList.remove('hidden');
+    }
+    function closeCloudModal() { document.getElementById('cloudModal').classList.add('hidden'); }
+    async function saveCloudConfig() {
+      const url = document.getElementById('cfgSupabaseUrl').value.trim();
+      const key = document.getElementById('cfgSupabaseKey').value.trim();
+      if (!url || !key) return alert('Preencha Project URL e Anon Key.');
+      localStorage.setItem(CLOUD_CFG_KEY, JSON.stringify({ url, key }));
+      initCloud();
+      await pullFromSupabase();
+      closeCloudModal();
+    }
+    function clearCloudConfig() {
+      localStorage.removeItem(CLOUD_CFG_KEY);
+      initCloud();
+      closeCloudModal();
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+      const senha = document.getElementById('loginPassword').value.trim();
+      const errEl = document.getElementById('loginError');
+      errEl.classList.add('hidden');
+
+      if (supabaseClient) {
+        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: senha });
+        if (error) {
+          errEl.textContent = 'Credenciais inválidas: ' + error.message;
+          errEl.classList.remove('hidden');
+          return;
+        }
+        const { data: perfil } = await supabaseClient.from('perfis').select('*').eq('id', data.user.id).single();
+        if (!perfil || !perfil.ativo) {
+          errEl.textContent = 'Usuário sem perfil ativo ou acesso bloqueado pela Central.';
+          errEl.classList.remove('hidden');
+          return;
+        }
+        currentUser = perfil;
+        await pullFromSupabase();
+      } else {
+        const st = getState();
+        const found = st.users.find(u => u.email.toLowerCase() === email && u.senha === senha);
+        if (!found) {
+          errEl.textContent = 'Login ou senha incorretos.';
+          errEl.classList.remove('hidden');
+          return;
+        }
+        if (!found.ativo) {
+          errEl.textContent = 'Acesso suspenso pela Central.';
+          errEl.classList.remove('hidden');
+          return;
+        }
+        currentUser = found;
+      }
+
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
+      enterAuthenticatedView();
+    }
+
+    function enterAuthenticatedView() {
+      if (!currentUser) return;
+      document.getElementById('loginScreen').classList.add('hidden');
+
+      if (currentUser.role === 'central') {
+        document.getElementById('centralScreen').classList.remove('hidden');
+        document.getElementById('centralOperatorInfo').textContent = `${currentUser.nome} (${currentUser.matricula})`;
+        initMap();
+        syncUiAll();
+      } else {
+        document.getElementById('gvScreen').classList.remove('hidden');
+        document.getElementById('gvUserLabel').textContent = `${currentUser.nome} • ${currentUser.matricula}`;
+        refreshGps();
+        requestWakeLock();
+        syncUiAll();
+      }
+    }
+
+    function restoreSession() {
+      const saved = sessionStorage.getItem(SESSION_KEY);
+      if (!saved) return;
+      try {
+        currentUser = JSON.parse(saved);
+        if (supabaseClient) pullFromSupabase().then(() => enterAuthenticatedView());
+        else enterAuthenticatedView();
+      } catch (_) {
+        sessionStorage.removeItem(SESSION_KEY);
+      }
+    }
+
+    function logout() {
+      stopSiren();
+      sessionStorage.removeItem(SESSION_KEY);
+      currentUser = null;
+      currentShift = null;
+      document.getElementById('gvScreen').classList.add('hidden');
+      document.getElementById('centralScreen').classList.add('hidden');
+      document.getElementById('loginScreen').classList.remove('hidden');
+    }
+
+    function calcDistanceMeters(lat1, lon1, lat2, lon2) {
+      const R = 6371e3;
+      const toRad = d => d * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function refreshGps() {
+      const el = document.getElementById('gvCheckinGpsStatus');
+      if (!navigator.geolocation) {
+        el.textContent = 'GPS indisponível no navegador (usará coord. do posto)';
+        return;
+      }
+      el.textContent = 'Obtendo coordenadas GPS...';
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          deviceGps = { lat: Number(pos.coords.latitude.toFixed(6)), lng: Number(pos.coords.longitude.toFixed(6)) };
+          el.textContent = `GPS Ativo: ${deviceGps.lat}, ${deviceGps.lng}`;
+          renderGvView();
+        },
+        () => {
+          deviceGps = null;
+          el.textContent = 'GPS bloqueado (usará coordenadas oficiais do posto)';
+        },
+        { enableHighAccuracy: true, timeout: 6000 }
+      );
+    }
+
+    async function assumePosto(postoId) {
+      const st = getState();
+      const alertBox = document.getElementById('gvCheckinAlert');
+      alertBox.classList.add('hidden');
+
+      const posto = st.postos.find(p => p.id === postoId);
+      if (!posto || !posto.ativo) return;
+
+      const ocupadoPosto = st.turnos_ativos.find(t => t.posto_id === posto.id && t.agente_id !== currentUser.id);
+      if (ocupadoPosto) {
+        alertBox.textContent = `BLOQUEADO: O ${posto.nome} já está ocupado por ${ocupadoPosto.agente_nome} (${ocupadoPosto.agente_matricula}).`;
+        alertBox.classList.remove('hidden');
+        return;
+      }
+
+      const targetLat = deviceGps ? deviceGps.lat : posto.lat;
+      const targetLng = deviceGps ? deviceGps.lng : posto.lng;
+
+      const ocupadoCoord = st.turnos_ativos.find(t => {
+        if (t.agente_id === currentUser.id) return false;
+        const mesmaCoordExata = (Number(t.lat).toFixed(5) === Number(targetLat).toFixed(5) && Number(t.lng).toFixed(5) === Number(targetLng).toFixed(5));
+        const mesmaCoordPosto = (Number(t.lat).toFixed(5) === Number(posto.lat).toFixed(5) && Number(t.lng).toFixed(5) === Number(posto.lng).toFixed(5));
+        const dist = calcDistanceMeters(t.lat, t.lng, targetLat, targetLng);
+        return mesmaCoordExata || mesmaCoordPosto || dist < 25;
+      });
+
+      if (ocupadoCoord) {
+        alertBox.textContent = `BLOQUEADO POR COORDENADA: Já existe um agente (${ocupadoCoord.agente_nome} no ${ocupadoCoord.posto_nome}) operando nestas mesmas coordenadas.`;
+        alertBox.classList.remove('hidden');
+        return;
+      }
+
+      const novoTurno = {
+        id: 'turno-' + Date.now(),
+        agente_id: currentUser.id,
+        agente_nome: currentUser.nome,
+        agente_matricula: currentUser.matricula,
+        posto_id: posto.id,
+        posto_nome: posto.nome,
+        lat: targetLat,
+        lng: targetLng,
+        iniciado_em: new Date().toISOString()
+      };
+
+      if (supabaseClient) {
+        await supabaseClient.from('turnos_ativos').delete().eq('agente_id', currentUser.id);
+        const { error } = await supabaseClient.from('turnos_ativos').insert(novoTurno);
+        if (error) {
+          alertBox.textContent = 'Conflito simultâneo: Este posto ou coordenada acabou de ser assumido por outro guarda-vidas.';
+          alertBox.classList.remove('hidden');
+          await pullFromSupabase();
+          return;
+        }
+        await pullFromSupabase();
+      } else {
+        st.turnos_ativos = st.turnos_ativos.filter(t => t.agente_id !== currentUser.id);
+        st.turnos_ativos.push(novoTurno);
+        setState(st);
+      }
+    }
+
+    async function releaseCurrentPosto() {
+      if (!currentUser) return;
+      if (supabaseClient) {
+        await supabaseClient.from('turnos_ativos').delete().eq('agente_id', currentUser.id);
+        await pullFromSupabase();
+      } else {
+        const st = getState();
+        st.turnos_ativos = st.turnos_ativos.filter(t => t.agente_id !== currentUser.id);
+        setState(st);
+      }
+    }
+
+    function selectNature(nat) {
+      selectedNature = nat;
+      document.querySelectorAll('.nature-btn').forEach(btn => {
+        btn.classList.toggle('selected', btn.dataset.nature === nat);
+      });
+    }
+
+    async function triggerSosAlert() {
+      if (!currentUser || !currentShift) return;
+      const lat = deviceGps ? deviceGps.lat : currentShift.lat;
+      const lng = deviceGps ? deviceGps.lng : currentShift.lng;
+
+      const novoAlerta = {
+        id: 'sos-' + Date.now(),
+        posto_id: currentShift.posto_id,
+        posto_nome: currentShift.posto_nome,
+        agente_id: currentUser.id,
+        agente_nome: `${currentUser.nome} (${currentUser.matricula})`,
+        natureza: selectedNature,
+        lat,
+        lng,
+        status: 'ativo',
+        criado_em: new Date().toISOString()
+      };
+
+      if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 500]);
+
+      if (supabaseClient) {
+        await supabaseClient.from('alertas').insert(novoAlerta);
+        await pullFromSupabase();
+      } else {
+        const st = getState();
+        st.alertas.unshift(novoAlerta);
+        setState(st);
+      }
+    }
+
+    async function cancelOwnAlert(alertId) {
+      if (supabaseClient) {
+        await supabaseClient.from('alertas').delete().eq('id', alertId);
+        await pullFromSupabase();
+      } else {
+        const st = getState();
+        st.alertas = st.alertas.filter(a => a.id !== alertId);
+        setState(st);
+      }
+    }
+
+    function renderGvView() {
+      if (!currentUser || currentUser.role !== 'guarda_vidas') return;
+      const st = getState();
+      currentShift = st.turnos_ativos.find(t => t.agente_id === currentUser.id) || null;
+
+      const checkinEl = document.getElementById('gvCheckinStep');
+      const sosEl = document.getElementById('gvSosStep');
+
+      if (!currentShift) {
+        checkinEl.classList.remove('hidden');
+        sosEl.classList.add('hidden');
+        const list = document.getElementById('gvPostoList');
+        list.innerHTML = st.postos.map(p => {
+          const occ = st.turnos_ativos.find(t => t.posto_id === p.id);
+          const coordConflict = !occ && st.turnos_ativos.find(t =>
+            Number(t.lat).toFixed(5) === Number(p.lat).toFixed(5) &&
+            Number(t.lng).toFixed(5) === Number(p.lng).toFixed(5)
+          );
+          const disabled = !p.ativo || Boolean(occ) || Boolean(coordConflict);
+          let statusTag = '<span class="badge badge-green">Disponível</span>';
+          let actionBtn = `<button onclick="assumePosto('${p.id}')" style="padding:8px 14px; background:#0284c7; color:#fff; font-size:12px;">Assumir</button>`;
+
+          if (!p.ativo) {
+            statusTag = '<span class="badge badge-gray">Inativo</span>';
+            actionBtn = '<span style="font-size:11px; color:#64748b;">Indisponível</span>';
+          } else if (occ) {
+            statusTag = `<span class="badge badge-red">Ocupado • ${occ.agente_nome}</span>`;
+            actionBtn = '<span style="font-size:11px; color:#f87171; font-weight:700;">Bloqueado</span>';
+          } else if (coordConflict) {
+            statusTag = `<span class="badge badge-amber">Coord. em uso (${coordConflict.posto_nome})</span>`;
+            actionBtn = '<span style="font-size:11px; color:#fbbf24; font-weight:700;">Bloqueado</span>';
+          }
+
+          return `
+            <div class="posto-item ${disabled ? 'locked' : ''}">
+              <div>
+                <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                  <span style="font-size:14px; font-weight:700;">${p.nome}</span>
+                  ${statusTag}
+                </div>
+                <div class="mono" style="font-size:11px; color:#94a3b8; margin-top:4px;">${Number(p.lat).toFixed(5)}, ${Number(p.lng).toFixed(5)}</div>
+              </div>
+              ${actionBtn}
+            </div>
+          `;
+        }).join('');
+      } else {
+        checkinEl.classList.add('hidden');
+        sosEl.classList.remove('hidden');
+        document.getElementById('gvActivePostoName').textContent = currentShift.posto_nome;
+        const displayLat = deviceGps ? deviceGps.lat : currentShift.lat;
+        const displayLng = deviceGps ? deviceGps.lng : currentShift.lng;
+        document.getElementById('gvActiveCoords').textContent = `${displayLat}, ${displayLng}`;
+
+        const myLastAlert = st.alertas.find(a => a.agente_id === currentUser.id && a.status !== 'atendido');
+        const banner = document.getElementById('gvStatusBanner');
+        if (myLastAlert) {
+          banner.classList.remove('hidden');
+          if (myLastAlert.status === 'ciente') {
+            banner.style.borderColor = '#10b981';
+            banner.style.background = 'rgba(6, 78, 59, 0.55)';
+            banner.innerHTML = `
+              <div style="font-size:12px; font-weight:900; color:#34d399;">✓ CENTRAL CIENTE — APOIO DESPACHADO</div>
+              <div style="font-size:12px; margin-top:4px;">A equipe de resgate já recebeu sua localização (${myLastAlert.posto_nome}).</div>
+            `;
+          } else {
+            const elapsedSec = Math.floor((Date.now() - new Date(myLastAlert.criado_em).getTime()) / 1000);
+            banner.style.borderColor = '#ef4444';
+            banner.style.background = 'rgba(127, 29, 29, 0.65)';
+            banner.innerHTML = `
+              <div style="font-size:12px; font-weight:900; color:#fca5a5;">🚨 ALERTA SOS TRANSMITIDO!</div>
+              <div style="font-size:12px; margin-top:4px;">Aguardando confirmação visual da Central...</div>
+              ${elapsedSec <= 8 ? `<button onclick="cancelOwnAlert('${myLastAlert.id}')" class="btn-secondary" style="margin-top:10px;">Cancelar Falso Disparo</button>` : ''}
+            `;
+          }
+        } else {
+          banner.classList.add('hidden');
+        }
+      }
+    }
+
+    async function requestWakeLock() {
+      try {
+        if ('wakeLock' in navigator) await navigator.wakeLock.request('screen');
+      } catch (_) {}
+    }
+
+    function unlockAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const btn = document.getElementById('audioUnlockBtn');
+      btn.style.background = 'rgba(16, 185, 129, 0.16)';
+      btn.style.borderColor = 'rgba(52, 211, 153, 0.45)';
+      btn.style.color = '#34d399';
+      btn.textContent = '🔊 Sirene Armada';
+    }
+
+    function playYelpPulse() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const now = audioCtx.currentTime;
+
+      const osc1 = audioCtx.createOscillator();
+      const osc2 = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc1.type = 'sawtooth';
+      osc2.type = 'square';
+
+      osc1.frequency.setValueAtTime(850, now);
+      osc1.frequency.exponentialRampToValueAtTime(1680, now + 0.16);
+      osc1.frequency.exponentialRampToValueAtTime(900, now + 0.32);
+      osc1.frequency.exponentialRampToValueAtTime(1720, now + 0.48);
+      osc1.frequency.exponentialRampToValueAtTime(850, now + 0.62);
+
+      osc2.frequency.setValueAtTime(858, now);
+      osc2.frequency.exponentialRampToValueAtTime(1692, now + 0.16);
+      osc2.frequency.exponentialRampToValueAtTime(908, now + 0.32);
+      osc2.frequency.exponentialRampToValueAtTime(1735, now + 0.48);
+      osc2.frequency.exponentialRampToValueAtTime(858, now + 0.62);
+
+      gain.gain.setValueAtTime(0.45, now);
+      gain.gain.setValueAtTime(0.45, now + 0.58);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.63);
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc1.start(now);
+      osc2.start(now);
+      osc1.stop(now + 0.64);
+      osc2.stop(now + 0.64);
+    }
+
+    function startSiren() {
+      if (sirenInterval) return;
+      playYelpPulse();
+      sirenInterval = setInterval(playYelpPulse, 640);
+    }
+
+    function stopSiren() {
+      if (sirenInterval) {
+        clearInterval(sirenInterval);
+        sirenInterval = null;
+      }
+    }
+
+    function testSiren() {
+      unlockAudio();
+      playYelpPulse();
+    }
+
+    function switchCentralTab(tabName) {
+      ['monitor', 'admin', 'deploy'].forEach(t => {
+        document.getElementById(`tab-${t}`).classList.add('hidden');
+        document.getElementById(`tabBtn-${t}`).classList.remove('active');
+      });
+      document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+      document.getElementById(`tabBtn-${tabName}`).classList.add('active');
+      if (tabName === 'monitor' && map) setTimeout(() => map.invalidateSize(), 150);
+    }
+
+    function initMap() {
+      if (map || typeof L === 'undefined') return;
+      map = L.map('map').setView([-8.1150, -34.8920], 13);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap &copy; CARTO',
+        maxZoom: 19
+      }).addTo(map);
+      mapMarkersLayer = L.layerGroup().addTo(map);
+
+      map.on('click', (e) => {
+        document.getElementById('postoLat').value = e.latlng.lat.toFixed(6);
+        document.getElementById('postoLng').value = e.latlng.lng.toFixed(6);
+      });
+    }
+
+    async function acknowledgeAlert(id) {
+      if (supabaseClient) {
+        await supabaseClient.from('alertas').update({ status: 'ciente', ciente_em: new Date().toISOString() }).eq('id', id);
+        await pullFromSupabase();
+      } else {
+        const st = getState();
+        const a = st.alertas.find(x => x.id === id);
+        if (a) { a.status = 'ciente'; a.ciente_em = new Date().toISOString(); }
+        setState(st);
+      }
+    }
+
+    async function closeAlert(id) {
+      if (supabaseClient) {
+        await supabaseClient.from('alertas').update({ status: 'atendido', encerrado_em: new Date().toISOString() }).eq('id', id);
+        await pullFromSupabase();
+      } else {
+        const st = getState();
+        const a = st.alertas.find(x => x.id === id);
+        if (a) { a.status = 'atendido'; a.encerrado_em = new Date().toISOString(); }
+        setState(st);
+      }
+    }
+
+    async function forceReleaseShift(turnoId) {
+      if (supabaseClient) {
+        await supabaseClient.from('turnos_ativos').delete().eq('id', turnoId);
+        await pullFromSupabase();
+      } else {
+        const st = getState();
+        st.turnos_ativos = st.turnos_ativos.filter(t => t.id !== turnoId);
+        setState(st);
+      }
+    }
+
+    async function handleCreateUser(e) {
+      e.preventDefault();
+      const nome = document.getElementById('newUserName').value.trim();
+      const matricula = document.getElementById('newUserBadge').value.trim().toUpperCase();
+      const email = document.getElementById('newUserEmail').value.trim().toLowerCase();
+      const senha = document.getElementById('newUserPass').value.trim();
+      const role = document.getElementById('newUserRole').value;
+
+      if (supabaseClient && supabaseAdminAux) {
+        const { data, error } = await supabaseAdminAux.auth.signUp({ email, password: senha });
+        if (error) return alert('Erro ao criar login: ' + error.message);
+        await supabaseClient.from('perfis').insert({
+          id: data.user.id, nome, matricula, email, role, ativo: true
+        });
+        await pullFromSupabase();
+      } else {
+        const st = getState();
+        if (st.users.some(u => u.email === email || u.matricula === matricula)) {
+          return alert('Já existe uma pessoa cadastrada com este e-mail ou matrícula.');
+        }
+        st.users.push({
+          id: 'u-' + Date.now(), nome, matricula, email, senha, role, ativo: true
+        });
+        setState(st);
+      }
+      e.target.reset();
+    }
+
+    async function toggleUserStatus(userId) {
+      if (userId === currentUser.id) return alert('Você não pode bloquear seu próprio acesso.');
+      const st = getState();
+      const u = st.users.find(x => x.id === userId);
+      if (!u) return;
+      if (supabaseClient) {
+        await supabaseClient.from('perfis').update({ ativo: !u.ativo }).eq('id', userId);
+        await pullFromSupabase();
+      } else {
+        u.ativo = !u.ativo;
+        if (!u.ativo) st.turnos_ativos = st.turnos_ativos.filter(t => t.agente_id !== userId);
+        setState(st);
+      }
+    }
+
+    async function changeUserPassword(userId) {
+      if (supabaseClient) return alert('No servidor Supabase, altere a senha pelo painel Authentication > Users.');
+      const nova = prompt('Digite a nova senha (mínimo 6 caracteres):');
+      if (!nova || nova.trim().length < 6) return;
+      const st = getState();
+      const u = st.users.find(x => x.id === userId);
+      if (u) { u.senha = nova.trim(); setState(st); }
+    }
+
+    async function handleSavePosto(e) {
+      e.preventDefault();
+      const editId = document.getElementById('editPostoId').value;
+      const nome = document.getElementById('postoName').value.trim();
+      const lat = Number(document.getElementById('postoLat').value);
+      const lng = Number(document.getElementById('postoLng').value);
+
+      const st = getState();
+      const dupCoord = st.postos.find(p =>
+        p.id !== editId &&
+        Number(p.lat).toFixed(5) === lat.toFixed(5) &&
+        Number(p.lng).toFixed(5) === lng.toFixed(5)
+      );
+      if (dupCoord) {
+        return alert(`Coordenadas já cadastradas no "${dupCoord.nome}". Cada posto precisa de coordenadas exclusivas.`);
+      }
+
+      if (supabaseClient) {
+        if (editId) {
+          await supabaseClient.from('postos').update({ nome, lat, lng }).eq('id', editId);
+        } else {
+          await supabaseClient.from('postos').insert({ nome, lat, lng, ativo: true });
+        }
+        await pullFromSupabase();
+      } else {
+        if (editId) {
+          const p = st.postos.find(x => x.id === editId);
+          if (p) { p.nome = nome; p.lat = lat; p.lng = lng; }
+        } else {
+          st.postos.push({ id: 'p-' + Date.now(), nome, lat, lng, ativo: true });
+        }
+        setState(st);
+      }
+      resetPostoForm();
+    }
+
+    function editPosto(id) {
+      const p = getState().postos.find(x => x.id === id);
+      if (!p) return;
+      document.getElementById('editPostoId').value = p.id;
+      document.getElementById('postoName').value = p.nome;
+      document.getElementById('postoLat').value = p.lat;
+      document.getElementById('postoLng').value = p.lng;
+      document.getElementById('savePostoBtn').textContent = 'Atualizar Posto';
+    }
+
+    function resetPostoForm() {
+      document.getElementById('editPostoId').value = '';
+      document.getElementById('postoName').value = '';
+      document.getElementById('postoLat').value = '';
+      document.getElementById('postoLng').value = '';
+      document.getElementById('savePostoBtn').textContent = 'Salvar Posto';
+    }
+
+    async function togglePostoActive(id) {
+      const st = getState();
+      const p = st.postos.find(x => x.id === id);
+      if (!p) return;
+      if (supabaseClient) {
+        await supabaseClient.from('postos').update({ ativo: !p.ativo }).eq('id', id);
+        await pullFromSupabase();
+      } else {
+        p.ativo = !p.ativo;
+        if (!p.ativo) st.turnos_ativos = st.turnos_ativos.filter(t => t.posto_id !== id);
+        setState(st);
+      }
+    }
+
+    function exportAlertsCsv() {
+      const st = getState();
+      const rows = [['ID', 'Posto', 'Agente', 'Natureza', 'Latitude', 'Longitude', 'Status', 'Criado Em', 'Encerrado Em']];
+      st.alertas.forEach(a => {
+        rows.push([a.id, a.posto_nome, a.agente_nome, a.natureza, a.lat, a.lng, a.status, a.criado_em, a.encerrado_em || '']);
+      });
+      const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `olho_no_mar_ocorrencias_${new Date().toISOString().slice(0,10)}.csv`;
+      a.click();
+    }
+
+    function copyCode(id) {
+      navigator.clipboard.writeText(document.getElementById(id).textContent);
+      alert('Código copiado!');
+    }
+
+    function renderCentralView() {
+      if (!currentUser || currentUser.role !== 'central') return;
+      const st = getState();
+
+      const unackedAlerts = st.alertas.filter(a => a.status === 'ativo');
+      const openAlerts = st.alertas.filter(a => a.status !== 'atendido');
+      const closedAlerts = st.alertas.filter(a => a.status === 'atendido');
+
+      if (unackedAlerts.length > 0) startSiren();
+      else stopSiren();
+
+      document.getElementById('activeAlertCount').textContent = openAlerts.length;
+      document.getElementById('activeShiftCount').textContent = st.turnos_ativos.length;
+
+      const activeList = document.getElementById('activeAlertsList');
+      if (openAlerts.length === 0) {
+        activeList.innerHTML = '<p style="font-size:12px; color:#64748b; text-align:center; padding:12px;">Nenhuma ocorrência ativa na orla.</p>';
+      } else {
+        activeList.innerHTML = openAlerts.map(a => {
+          const hora = new Date(a.criado_em).toLocaleTimeString('pt-BR');
+          const isUnacked = a.status === 'ativo';
+          return `
+            <div class="alert-card ${isUnacked ? '' : 'ciente'}">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+                <div>
+                  <span class="badge ${isUnacked ? 'badge-red' : 'badge-amber'}">${isUnacked ? '🚨 NOVO SOS' : '✓ CENTRAL CIENTE'}</span>
+                  <div style="font-size:14px; font-weight:900; margin-top:6px;">${a.posto_nome}</div>
+                  <div style="font-size:12px; color:#e2e8f0; font-weight:600;">${a.natureza}</div>
+                  <div style="font-size:11px; color:#94a3b8; margin-top:2px;">Agente: ${a.agente_nome} • ${hora}</div>
+                  <div class="mono" style="font-size:11px; color:#7dd3fc; margin-top:2px;">${Number(a.lat).toFixed(5)}, ${Number(a.lng).toFixed(5)}</div>
+                </div>
+                <button onclick="map && map.flyTo([${a.lat}, ${a.lng}], 17)" class="btn-secondary">Focar</button>
+              </div>
+              <div style="display:flex; gap:8px; margin-top:12px;">
+                ${isUnacked ? `<button onclick="acknowledgeAlert('${a.id}')" style="flex:1; padding:8px; background:#f59e0b; color:#020617; font-size:11px; font-weight:900;">Confirmar (ACK)</button>` : ''}
+                <button onclick="closeAlert('${a.id}')" style="flex:1; padding:8px; background:#059669; color:#fff; font-size:11px;">Encerrar Ocorrência</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      const shiftList = document.getElementById('activeShiftsList');
+      if (st.turnos_ativos.length === 0) {
+        shiftList.innerHTML = '<p style="font-size:12px; color:#64748b;">Nenhum agente realizou check-in em posto.</p>';
+      } else {
+        shiftList.innerHTML = st.turnos_ativos.map(t => `
+          <div class="posto-item">
+            <div>
+              <div style="font-size:12px; font-weight:700;">${t.posto_nome} — <span style="color:#34d399;">${t.agente_nome}</span></div>
+              <div class="mono" style="font-size:10px; color:#94a3b8;">${t.agente_matricula} • ${Number(t.lat).toFixed(5)}, ${Number(t.lng).toFixed(5)}</div>
+            </div>
+            <button onclick="forceReleaseShift('${t.id}')" class="btn-secondary">Liberar</button>
+          </div>
+        `).join('');
+      }
+
+      const histList = document.getElementById('historyAlertsList');
+      histList.innerHTML = closedAlerts.slice(0, 10).map(a => `
+        <div class="posto-item" style="opacity:0.8;">
+          <div>
+            <div style="font-size:12px; font-weight:700;">${a.posto_nome} • ${a.natureza}</div>
+            <div style="font-size:11px; color:#94a3b8;">${a.agente_nome}</div>
+          </div>
+          <span class="badge badge-green">Atendido</span>
+        </div>
+      `).join('') || '<p style="font-size:12px; color:#64748b;">Sem registros anteriores.</p>';
+
+      document.getElementById('usersTableList').innerHTML = st.users.map(u => `
+        <div class="posto-item">
+          <div>
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+              <span style="font-size:12px; font-weight:700;">${u.nome}</span>
+              <span class="badge badge-gray mono">${u.matricula}</span>
+              <span class="badge ${u.role === 'central' ? 'badge-amber' : 'badge-green'}">${u.role === 'central' ? 'Central' : 'Guarda-Vidas'}</span>
+            </div>
+            <div style="font-size:11px; color:#94a3b8; margin-top:4px;">Login: ${u.email} • Senha: <span class="mono">${u.senha}</span></div>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button onclick="changeUserPassword('${u.id}')" class="btn-secondary">Senha</button>
+            <button onclick="toggleUserStatus('${u.id}')" class="btn-secondary" style="color:${u.ativo ? '#34d399' : '#f87171'};">
+              ${u.ativo ? 'Ativo' : 'Bloq.'}
+            </button>
+          </div>
+        </div>
+      `).join('');
+
+      document.getElementById('postosAdminList').innerHTML = st.postos.map(p => {
+        const occ = st.turnos_ativos.find(t => t.posto_id === p.id);
+        return `
+          <div class="posto-item">
+            <div>
+              <div style="font-size:12px; font-weight:700;">${p.nome} ${occ ? `<span style="color:#34d399;">(${occ.agente_nome})</span>` : ''}</div>
+              <div class="mono" style="font-size:11px; color:#94a3b8;">${Number(p.lat).toFixed(5)}, ${Number(p.lng).toFixed(5)}</div>
+            </div>
+            <div style="display:flex; gap:6px;">
+              <button onclick="editPosto('${p.id}')" class="btn-secondary" style="color:#38bdf8;">Editar</button>
+              <button onclick="togglePostoActive('${p.id}')" class="btn-secondary" style="color:${p.ativo ? '#34d399' : '#94a3b8'};">
+                ${p.ativo ? 'Ativo' : 'Inativo'}
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      if (map && mapMarkersLayer && typeof L !== 'undefined') {
+        mapMarkersLayer.clearLayers();
+        st.postos.forEach(p => {
+          const occ = st.turnos_ativos.find(t => t.posto_id === p.id);
+          const cls = !p.ativo ? 'posto-marker inactive' : (occ ? 'posto-marker occupied' : 'posto-marker');
+          const icon = L.divIcon({ className: '', html: `<div class="${cls}"></div>`, iconSize: [16, 16] });
+          const m = L.marker([p.lat, p.lng], { icon, draggable: true }).addTo(mapMarkersLayer);
+          m.bindPopup(`<b>${p.nome}</b><br>${occ ? 'Ocupado: ' + occ.agente_nome : 'Posto Livre'}`);
+          m.on('dragend', async (ev) => {
+            const pos = ev.target.getLatLng();
+            if (supabaseClient) {
+              await supabaseClient.from('postos').update({ lat: Number(pos.lat.toFixed(6)), lng: Number(pos.lng.toFixed(6)) }).eq('id', p.id);
+              await pullFromSupabase();
+            } else {
+              const s = getState();
+              const item = s.postos.find(x => x.id === p.id);
+              if (item) { item.lat = Number(pos.lat.toFixed(6)); item.lng = Number(pos.lng.toFixed(6)); }
+              setState(s);
+            }
+          });
+        });
+
+        openAlerts.forEach(a => {
+          const sosIcon = L.divIcon({ className: 'sos-marker', html: '<div class="marker-ping"></div>', iconSize: [22, 22] });
+          L.marker([a.lat, a.lng], { icon: sosIcon })
+            .addTo(mapMarkersLayer)
+            .bindPopup(`<b style="color:#ef4444">🚨 SOS — ${a.posto_nome}</b><br>${a.natureza}<br>Agente: ${a.agente_nome}`)
+            .openPopup();
+        });
+      }
+    }
+
+    function syncUiAll() {
+      renderGvView();
+      renderCentralView();
+    }
+
+    initCloud();
+    restoreSession();
+  </script>
+</body>
+</html>
